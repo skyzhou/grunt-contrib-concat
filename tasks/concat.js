@@ -2,7 +2,7 @@
  * grunt-contrib-concat
  * http://gruntjs.com/
  *
- * Copyright (c) 2013 "Cowboy" Ben Alman, contributors
+ * Copyright (c) 2012 "Cowboy" Ben Alman, contributors
  * Licensed under the MIT license.
  */
 
@@ -46,9 +46,7 @@ module.exports = function(grunt) {
         // Read file source.
         var src = grunt.file.read(filepath);
         // Process files as templates if requested.
-        if (typeof options.process === 'function') {
-          src = options.process(src, filepath);
-        } else if (options.process) {
+        if (options.process) {
           src = grunt.template.process(src, options.process);
         }
         // Strip banners if requested.
@@ -56,7 +54,34 @@ module.exports = function(grunt) {
           src = comment.stripBanner(src, options.stripBanners);
         }
         return src;
-      }).join(options.separator) + footer;
+      }).join(grunt.util.normalizelf(options.separator)) + footer;
+
+      //如果有模版
+      if(f.template){
+          var map = {},
+              pat = /<template[^>]*name=['"]([\w.]*?)['"][^>]*>([\s\S]*?)<\/template>/ig;
+          f.template.filter(function(filepath){
+             // Warn on and remove invalid source files (if nonull was set).
+            if (!grunt.file.exists(filepath)) {
+              grunt.log.warn('Source file "' + filepath + '" not found.');
+              return false;
+            } else {
+              return true;
+            }
+          }).map(function(filepath){
+            var tmp = grunt.file.read(filepath),
+                ret;
+            while(ret = pat.exec(tmp)){
+              map[ret[1]] = ret[2].replace(/\'/g,"\\'").replace(/[\r\n\t]/g,'').replace(/\r\n/g,'');
+            }
+          });
+
+          for(var p in map){
+            src = src.replace(new RegExp(p.replace(/\./g,"\\."),'g'),function(match){
+              return "'"+map[p]+"'";
+            });
+          }
+      }
 
       // Write the destination file.
       grunt.file.write(f.dest, src);
